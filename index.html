@@ -5,74 +5,88 @@
   <title>Pixel Jackpot</title>
   <style>
     body {
+      margin: 0;
       font-family: Arial, sans-serif;
-      text-align: center;
+      background: #111;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
-    #grid {
-      display: grid;
-      grid-template-columns: repeat(50, 10px);
-      grid-template-rows: repeat(50, 10px);
-      gap: 1px;
-      margin: 20px auto;
-      width: max-content;
-    }
-    .pixel {
-      width: 10px;
-      height: 10px;
-      background: #ccc;
-      cursor: pointer;
-    }
-    .pixel:hover {
-      background: #999;
+    h1 {
+      margin: 20px 0 10px;
     }
     #status {
-      margin-top: 20px;
+      margin-bottom: 10px;
+      font-size: 18px;
+    }
+    #canvas-container {
+      overflow: auto;
+      border: 2px solid #fff;
+      width: 90vw;
+      height: 80vh;
+    }
+    canvas {
+      background: #222;
+      display: block;
     }
   </style>
 </head>
 <body>
   <h1>💰 Pixel Jackpot</h1>
   <div id="status">Cargando jackpot...</div>
-  <div id="grid"></div>
+  <div id="canvas-container">
+    <canvas id="board" width="5000" height="5000"></canvas>
+  </div>
 
   <script>
-    const API_BASE = 'https://pixel-jackpot.onrender.com/api';
+    const canvas = document.getElementById("board");
+    const ctx = canvas.getContext("2d");
+    const statusDiv = document.getElementById("status");
+    const PIXEL_SIZE = 5;
+    const GRID_SIZE = 1000;
+    const API = "https://pixel-jackpot.onrender.com/api";
 
-    async function getJackpot() {
-      const res = await fetch(`${API_BASE}/status`);
-      const data = await res.json();
-      document.getElementById('status').innerText = `Jackpot: ${data.jackpot.toFixed(2)}€`;
-    }
-
-    async function clickPixel(x, y) {
-      const res = await fetch(`${API_BASE}/click`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ x, y })
-      });
-      const result = await res.json();
-      if (result.won) {
-        alert(`🎉 ¡Ganaste ${result.amount.toFixed(2)}€!`);
-      } else {
-        alert(`❌ No acertaste. Intenta de nuevo.`);
-      }
-      getJackpot();
-    }
-
-    function createGrid() {
-      const grid = document.getElementById('grid');
-      for (let y = 0; y < 50; y++) {
-        for (let x = 0; x < 50; x++) {
-          const div = document.createElement('div');
-          div.className = 'pixel';
-          div.onclick = () => clickPixel(x * 20, y * 20); // escala a 1000x1000
-          grid.appendChild(div);
+    // Dibujar el grid de fondo
+    function drawGrid() {
+      ctx.fillStyle = "#333";
+      for (let x = 0; x < GRID_SIZE; x++) {
+        for (let y = 0; y < GRID_SIZE; y++) {
+          ctx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE - 1, PIXEL_SIZE - 1);
         }
       }
     }
 
-    createGrid();
-    getJackpot();
+    async function fetchJackpot() {
+      const res = await fetch(`${API}/status`);
+      const data = await res.json();
+      statusDiv.textContent = `Jackpot actual: ${data.jackpot.toFixed(2)} €`;
+    }
+
+    async function handleClick(event) {
+      const rect = canvas.getBoundingClientRect();
+      const x = Math.floor((event.clientX - rect.left + canvas.parentElement.scrollLeft) / PIXEL_SIZE);
+      const y = Math.floor((event.clientY - rect.top + canvas.parentElement.scrollTop) / PIXEL_SIZE);
+
+      const res = await fetch(`${API}/click`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ x, y })
+      });
+
+      const result = await res.json();
+      if (result.won) {
+        alert(`🎉 ¡Ganaste ${result.amount.toFixed(2)}€!`);
+      } else {
+        alert("❌ No acertaste.");
+      }
+
+      fetchJackpot();
+    }
+
+    canvas.addEventListener("click", handleClick);
+    drawGrid();
+    fetchJackpot();
   </script>
 </body>
 </html>
