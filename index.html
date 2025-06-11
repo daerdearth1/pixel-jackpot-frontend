@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Pixel Jackpot</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(50, 10px);
+      grid-template-rows: repeat(50, 10px);
+      gap: 1px;
+      margin: 20px auto;
+      width: max-content;
+    }
+    .pixel {
+      width: 10px;
+      height: 10px;
+      background: #ccc;
+      cursor: pointer;
+    }
+    .pixel:hover {
+      background: #999;
+    }
+    #status {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>💰 Pixel Jackpot</h1>
+  <div id="status">Cargando jackpot...</div>
+  <div id="grid"></div>
+
+  <script>
+    const API_BASE = 'https://pixel-jackpot.onrender.com/api';
+
+    async function getJackpot() {
+      const res = await fetch(`${API_BASE}/status`);
+      const data = await res.json();
+      document.getElementById('status').innerText = `Jackpot: ${data.jackpot.toFixed(2)}€`;
+    }
+
+    async function clickPixel(x, y) {
+      const res = await fetch(`${API_BASE}/click`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ x, y })
+      });
+      const result = await res.json();
+      if (result.won) {
+        alert(`🎉 ¡Ganaste ${result.amount.toFixed(2)}€!`);
+      } else {
+        alert(`❌ No acertaste. Intenta de nuevo.`);
+      }
+      getJackpot();
+    }
+
+    function createGrid() {
+      const grid = document.getElementById('grid');
+      for (let y = 0; y < 50; y++) {
+        for (let x = 0; x < 50; x++) {
+          const div = document.createElement('div');
+          div.className = 'pixel';
+          div.onclick = () => clickPixel(x * 20, y * 20); // escala a 1000x1000
+          grid.appendChild(div);
+        }
+      }
+    }
+
+    createGrid();
+    getJackpot();
+  </script>
+</body>
+</html>
