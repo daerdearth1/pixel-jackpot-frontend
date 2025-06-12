@@ -2,146 +2,145 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Pixel Jackpot</title>
   <style>
     body {
       margin: 0;
-      background-color: #111;
-      color: white;
-      font-family: Arial, sans-serif;
-      text-align: center;
+      font-family: 'Poppins', sans-serif;
+      background-color: #121212;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
     h1 {
-      margin: 20px 0 5px;
+      font-size: 2.5em;
+      margin-top: 20px;
+      color: #ffd700;
+      transition: transform 0.3s ease;
+    }
+
+    h1:hover {
+      transform: scale(1.05);
     }
 
     #jackpot {
-      font-size: 18px;
+      font-size: 1.2em;
       margin-bottom: 10px;
+      color: #ffffffcc;
+      transition: opacity 0.3s ease;
     }
 
-    #buyContainer {
-      margin-bottom: 10px;
+    #jackpot:hover {
+      opacity: 0.8;
     }
 
     #buyClickBtn {
       padding: 10px 20px;
-      background-color: gold;
+      font-size: 1em;
+      background-color: #ffd700;
+      color: #000;
       border: none;
-      font-weight: bold;
+      border-radius: 6px;
       cursor: pointer;
+      margin: 10px 0 5px;
+      transition: background-color 0.3s ease, transform 0.3s ease;
     }
 
     #buyClickBtn:hover {
-      background-color: #e6c200;
+      background-color: #ffc107;
+      transform: translateY(-2px);
+    }
+
+    #paymentOptions a {
+      display: block;
+      margin: 3px 0;
+      color: #7ec8ff;
+      text-decoration: none;
+      font-size: 0.95em;
+    }
+
+    #paymentOptions a:hover {
+      text-decoration: underline;
     }
 
     canvas {
-      display: block;
-      margin: 0 auto;
-      background-color: #222;
-      border: 1px solid white;
+      margin-top: 20px;
+      border: 1px solid #fff;
     }
   </style>
 </head>
 <body>
   <h1>💰 Pixel Jackpot</h1>
-  <p id="jackpot">Current Jackpot: ...</p>
-
-  <div id="buyContainer">
-    <button id="buyClickBtn">Buy 1 Try ($1)</button>
-    <div id="paymentOptions" style="display: none; margin-top: 5px;">
-      <a href="https://www.paypal.com/paypalme/tucuenta/1" target="_blank">Pay with PayPal</a><br>
-      <a href="https://commerce.coinbase.com/checkout/tucheckout" target="_blank">Pay with Crypto</a>
-    </div>
+  <div id="jackpot">Current Jackpot: ...</div>
+  <button id="buyClickBtn">Buy 1 Try ($1)</button>
+  <div id="paymentOptions">
+    <a href="https://www.paypal.com/paypalme/tuCuenta/1" target="_blank">Pay with PayPal</a>
+    <a href="https://commerce.coinbase.com/checkout/tuCheckout" target="_blank">Pay with Crypto</a>
   </div>
-
-  <canvas id="gridCanvas" width="1000" height="800"></canvas>
+  <canvas id="pixelCanvas" width="800" height="800"></canvas>
 
   <script>
-    const canvas = document.getElementById("gridCanvas");
+    const canvas = document.getElementById("pixelCanvas");
     const ctx = canvas.getContext("2d");
-    const pixelSize = 5;
-    const cols = canvas.width / pixelSize;
-    const rows = canvas.height / pixelSize;
-    const clickedPixels = new Set();
-    let jackpot = 0;
+    const gridSize = 5;
+    const cols = canvas.width / gridSize;
+    const rows = canvas.height / gridSize;
 
-    async function fetchJackpot() {
-      const res = await fetch("https://pixel-jackpot.onrender.com/api/status");
-      const data = await res.json();
-      jackpot = data.jackpot;
-      document.getElementById("jackpot").textContent = `Current Jackpot: ${jackpot.toFixed(2)} €`;
-    }
+    let clickedPixels = [];
 
     function drawGrid() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#2a2a2a";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.strokeStyle = "#444";
-
       for (let x = 0; x < cols; x++) {
         for (let y = 0; y < rows; y++) {
-          const key = `${x},${y}`;
-          if (clickedPixels.has(key)) {
-            ctx.fillStyle = "darkred";
-            ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
-          } else {
-            ctx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
-          }
+          ctx.strokeRect(x * gridSize, y * gridSize, gridSize, gridSize);
         }
       }
+      clickedPixels.forEach(p => {
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x * gridSize, p.y * gridSize, gridSize, gridSize);
+      });
     }
 
-    function markClicked(x, y) {
-      clickedPixels.add(`${x},${y}`);
-      drawGrid();
-    }
-
-    canvas.addEventListener("click", async (e) => {
-      if (!canClick) {
-        alert("You must buy a try first.");
-        return;
+    async function fetchJackpot() {
+      try {
+        const res = await fetch("https://pixel-jackpot.onrender.com/api/status");
+        const data = await res.json();
+        document.getElementById("jackpot").innerText = `Current Jackpot: ${data.jackpot.toFixed(2)} €`;
+      } catch {
+        document.getElementById("jackpot").innerText = "Error loading jackpot";
       }
+    }
 
+    async function handleClick(event) {
       const rect = canvas.getBoundingClientRect();
-      const x = Math.floor((e.clientX - rect.left) / pixelSize);
-      const y = Math.floor((e.clientY - rect.top) / pixelSize);
-
-      if (clickedPixels.has(`${x},${y}`)) {
-        alert("This pixel was already tried.");
-        return;
-      }
-
+      const x = Math.floor((event.clientX - rect.left) / gridSize);
+      const y = Math.floor((event.clientY - rect.top) / gridSize);
       try {
         const res = await fetch("https://pixel-jackpot.onrender.com/api/click", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ x, y })
         });
-
         const data = await res.json();
         if (data.won) {
           alert(`🎉 You won ${data.amount.toFixed(2)} €!`);
         } else {
-          markClicked(x, y);
+          clickedPixels.push({ x, y, color: "red" });
         }
-
+        drawGrid();
         fetchJackpot();
-        canClick = false; // reset after click
       } catch {
-        alert("Error processing click.");
+        alert("Error during click.");
       }
-    });
+    }
 
-    // Buy click system
-    let canClick = false;
-    document.getElementById("buyClickBtn").addEventListener("click", () => {
-      canClick = true;
-      document.getElementById("paymentOptions").style.display = "block";
-    });
+    canvas.addEventListener("click", handleClick);
 
-    // Init
     fetchJackpot();
     drawGrid();
   </script>
