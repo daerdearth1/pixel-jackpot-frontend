@@ -1,74 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
   <title>Pixel Jackpot</title>
   <style>
     body {
       margin: 0;
-      font-family: 'Poppins', sans-serif;
+      font-family: 'Segoe UI', sans-serif;
       background-color: #121212;
-      color: #fff;
+      color: white;
       display: flex;
       flex-direction: column;
       align-items: center;
     }
 
     h1 {
-      font-size: 2.5em;
-      margin-top: 20px;
-      color: #ffd700;
-      transition: transform 0.3s ease;
-    }
-
-    h1:hover {
-      transform: scale(1.05);
+      color: #ffc107;
+      font-size: 2em;
+      margin: 20px 0 5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
     #jackpot {
+      margin: 0 0 10px;
       font-size: 1.2em;
-      margin-bottom: 10px;
-      color: #ffffffcc;
-      transition: opacity 0.3s ease;
-    }
-
-    #jackpot:hover {
-      opacity: 0.8;
     }
 
     #buyClickBtn {
+      background-color: #ffc107;
+      color: black;
       padding: 10px 20px;
-      font-size: 1em;
-      background-color: #ffd700;
-      color: #000;
       border: none;
-      border-radius: 6px;
+      font-weight: bold;
       cursor: pointer;
-      margin: 10px 0 5px;
-      transition: background-color 0.3s ease, transform 0.3s ease;
+      border-radius: 6px;
+      transition: background-color 0.3s ease;
+      margin-bottom: 8px;
     }
 
     #buyClickBtn:hover {
-      background-color: #ffc107;
-      transform: translateY(-2px);
+      background-color: #e0a800;
     }
 
     #paymentOptions a {
-      display: block;
-      margin: 3px 0;
-      color: #7ec8ff;
+      color: #4eaaff;
       text-decoration: none;
-      font-size: 0.95em;
+      display: block;
+      margin-bottom: 5px;
+      transition: color 0.3s;
     }
 
     #paymentOptions a:hover {
-      text-decoration: underline;
+      color: #90caf9;
     }
 
     canvas {
+      border: 2px solid white;
       margin-top: 20px;
-      border: 1px solid #fff;
+      transition: all 0.3s ease;
     }
   </style>
 </head>
@@ -77,49 +68,49 @@
   <div id="jackpot">Current Jackpot: ...</div>
   <button id="buyClickBtn">Buy 1 Try ($1)</button>
   <div id="paymentOptions">
-    <a href="https://www.paypal.com/paypalme/tuCuenta/1" target="_blank">Pay with PayPal</a>
-    <a href="https://commerce.coinbase.com/checkout/tuCheckout" target="_blank">Pay with Crypto</a>
+    <a href="https://www.paypal.com/paypalme/tuusuario/1" target="_blank">Pay with PayPal</a>
+    <a href="https://commerce.coinbase.com/checkout/tupago" target="_blank">Pay with Crypto</a>
   </div>
-  <canvas id="pixelCanvas" width="800" height="800"></canvas>
+  <canvas id="grid" width="1000" height="1000"></canvas>
 
   <script>
-    const canvas = document.getElementById("pixelCanvas");
-    const ctx = canvas.getContext("2d");
-    const gridSize = 5;
-    const cols = canvas.width / gridSize;
-    const rows = canvas.height / gridSize;
+    const canvas = document.getElementById('grid');
+    const ctx = canvas.getContext('2d');
+    const cellSize = 5;
+    const cols = canvas.width / cellSize;
+    const rows = canvas.height / cellSize;
 
-    let clickedPixels = [];
+    let clickedCells = new Set();
 
     function drawGrid() {
-      ctx.fillStyle = "#2a2a2a";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.strokeStyle = "#444";
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = '#2c2c2c';
       for (let x = 0; x < cols; x++) {
         for (let y = 0; y < rows; y++) {
-          ctx.strokeRect(x * gridSize, y * gridSize, gridSize, gridSize);
+          const key = `${x},${y}`;
+          if (clickedCells.has(key)) {
+            ctx.fillStyle = '#ff1744'; // red
+            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+          } else {
+            ctx.strokeRect(x * cellSize, y * cellSize, cellSize, cellSize);
+          }
         }
       }
-      clickedPixels.forEach(p => {
-        ctx.fillStyle = p.color;
-        ctx.fillRect(p.x * gridSize, p.y * gridSize, gridSize, gridSize);
-      });
     }
 
     async function fetchJackpot() {
-      try {
-        const res = await fetch("https://pixel-jackpot.onrender.com/api/status");
-        const data = await res.json();
-        document.getElementById("jackpot").innerText = `Current Jackpot: ${data.jackpot.toFixed(2)} €`;
-      } catch {
-        document.getElementById("jackpot").innerText = "Error loading jackpot";
-      }
+      const res = await fetch("https://pixel-jackpot.onrender.com/api/status");
+      const data = await res.json();
+      document.getElementById("jackpot").textContent = `Current Jackpot: ${data.jackpot.toFixed(2)} €`;
     }
 
     async function handleClick(event) {
       const rect = canvas.getBoundingClientRect();
-      const x = Math.floor((event.clientX - rect.left) / gridSize);
-      const y = Math.floor((event.clientY - rect.top) / gridSize);
+      const x = Math.floor((event.clientX - rect.left) / cellSize);
+      const y = Math.floor((event.clientY - rect.top) / cellSize);
+      const key = `${x},${y}`;
+      if (clickedCells.has(key)) return;
+
       try {
         const res = await fetch("https://pixel-jackpot.onrender.com/api/click", {
           method: "POST",
@@ -130,17 +121,16 @@
         if (data.won) {
           alert(`🎉 You won ${data.amount.toFixed(2)} €!`);
         } else {
-          clickedPixels.push({ x, y, color: "red" });
+          clickedCells.add(key);
         }
         drawGrid();
         fetchJackpot();
       } catch {
-        alert("Error during click.");
+        alert("Error clicking cell.");
       }
     }
 
     canvas.addEventListener("click", handleClick);
-
     fetchJackpot();
     drawGrid();
   </script>
