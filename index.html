@@ -59,7 +59,6 @@
     canvas {
       border: 2px solid white;
       margin-top: 20px;
-      transition: all 0.3s ease;
     }
   </style>
 </head>
@@ -81,33 +80,24 @@
     const rows = canvas.height / cellSize;
 
     let clickedCells = new Set();
+    let hoverX = -1;
+    let hoverY = -1;
 
-    function drawGrid() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.strokeStyle = '#2c2c2c';
-      for (let x = 0; x < cols; x++) {
-        for (let y = 0; y < rows; y++) {
-          const key = `${x},${y}`;
-          if (clickedCells.has(key)) {
-            ctx.fillStyle = '#ff1744'; // red
-            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-          } else {
-            ctx.strokeRect(x * cellSize, y * cellSize, cellSize, cellSize);
-          }
-        }
-      }
-    }
-
-    async function fetchJackpot() {
-      const res = await fetch("https://pixel-jackpot.onrender.com/api/status");
-      const data = await res.json();
-      document.getElementById("jackpot").textContent = `Current Jackpot: ${data.jackpot.toFixed(2)} €`;
-    }
-
-    async function handleClick(event) {
+    canvas.addEventListener("mousemove", (e) => {
       const rect = canvas.getBoundingClientRect();
-      const x = Math.floor((event.clientX - rect.left) / cellSize);
-      const y = Math.floor((event.clientY - rect.top) / cellSize);
+      hoverX = Math.floor((e.clientX - rect.left) / cellSize);
+      hoverY = Math.floor((e.clientY - rect.top) / cellSize);
+    });
+
+    canvas.addEventListener("mouseleave", () => {
+      hoverX = -1;
+      hoverY = -1;
+    });
+
+    canvas.addEventListener("click", async (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = Math.floor((e.clientX - rect.left) / cellSize);
+      const y = Math.floor((e.clientY - rect.top) / cellSize);
       const key = `${x},${y}`;
       if (clickedCells.has(key)) return;
 
@@ -123,14 +113,50 @@
         } else {
           clickedCells.add(key);
         }
-        drawGrid();
         fetchJackpot();
       } catch {
         alert("Error clicking cell.");
       }
+    });
+
+    function drawGrid() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = '#2c2c2c';
+
+      for (let x = 0; x < cols; x++) {
+        for (let y = 0; y < rows; y++) {
+          const key = `${x},${y}`;
+          if (clickedCells.has(key)) {
+            ctx.fillStyle = '#ff1744'; // rojo si fue fallado
+            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+          } else {
+            ctx.strokeRect(x * cellSize, y * cellSize, cellSize, cellSize);
+          }
+        }
+      }
+
+      if (hoverX !== -1 && hoverY !== -1) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.fillRect(hoverX * cellSize, hoverY * cellSize, cellSize, cellSize);
+      }
+
+      requestAnimationFrame(drawGrid);
     }
 
-    canvas.addEventListener("click", handleClick);
+    async function fetchJackpot() {
+      try {
+        const res = await fetch("https://pixel-jackpot.onrender.com/api/status");
+        const data = await res.json();
+        document.getElementById("jackpot").textContent = `Current Jackpot: ${data.jackpot.toFixed(2)} €`;
+      } catch {
+        document.getElementById("jackpot").textContent = "Jackpot unavailable";
+      }
+    }
+
+    document.getElementById('buyClickBtn').addEventListener('click', () => {
+      document.getElementById('paymentOptions').style.display = 'block';
+    });
+
     fetchJackpot();
     drawGrid();
   </script>
