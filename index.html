@@ -1,67 +1,94 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pixel Jackpot</title>
   <style>
     body {
+      margin: 0;
       background-color: #111;
       color: white;
       font-family: Arial, sans-serif;
       text-align: center;
     }
-    #gridCanvas {
-      border: 2px solid white;
-      margin-top: 20px;
-      cursor: pointer;
+
+    h1 {
+      margin: 20px 0 5px;
     }
+
+    #jackpot {
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+
+    #buyContainer {
+      margin-bottom: 10px;
+    }
+
     #buyClickBtn {
-      margin-top: 20px;
       padding: 10px 20px;
-      font-size: 16px;
-      background: gold;
+      background-color: gold;
       border: none;
+      font-weight: bold;
       cursor: pointer;
     }
-    #paymentOptions a {
-      color: white;
+
+    #buyClickBtn:hover {
+      background-color: #e6c200;
+    }
+
+    canvas {
       display: block;
-      margin: 5px 0;
-      text-decoration: underline;
+      margin: 0 auto;
+      background-color: #222;
+      border: 1px solid white;
     }
   </style>
 </head>
 <body>
   <h1>💰 Pixel Jackpot</h1>
-  <p id="jackpotDisplay">Jackpot actual: ...</p>
+  <p id="jackpot">Current Jackpot: ...</p>
 
-  <button id="buyClickBtn">Comprar 1 intento ($1)</button>
-  <div id="paymentOptions" style="display: none;">
-    <a href="https://www.paypal.com/paypalme/tucuenta/1" target="_blank">Pagar con PayPal</a>
-    <a href="https://commerce.coinbase.com/checkout/tucheckout" target="_blank">Pagar con Cripto</a>
+  <div id="buyContainer">
+    <button id="buyClickBtn">Buy 1 Try ($1)</button>
+    <div id="paymentOptions" style="display: none; margin-top: 5px;">
+      <a href="https://www.paypal.com/paypalme/tucuenta/1" target="_blank">Pay with PayPal</a><br>
+      <a href="https://commerce.coinbase.com/checkout/tucheckout" target="_blank">Pay with Crypto</a>
+    </div>
   </div>
 
-  <canvas id="gridCanvas" width="1000" height="1000"></canvas>
+  <canvas id="gridCanvas" width="1000" height="800"></canvas>
 
   <script>
     const canvas = document.getElementById("gridCanvas");
     const ctx = canvas.getContext("2d");
-    const gridSize = 200; // 200x200 = 40,000 píxeles
     const pixelSize = 5;
+    const cols = canvas.width / pixelSize;
+    const rows = canvas.height / pixelSize;
     const clickedPixels = new Set();
+    let jackpot = 0;
+
+    async function fetchJackpot() {
+      const res = await fetch("https://pixel-jackpot.onrender.com/api/status");
+      const data = await res.json();
+      jackpot = data.jackpot;
+      document.getElementById("jackpot").textContent = `Current Jackpot: ${jackpot.toFixed(2)} €`;
+    }
 
     function drawGrid() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "#333";
-      for (let y = 0; y < gridSize; y++) {
-        for (let x = 0; x < gridSize; x++) {
+      ctx.strokeStyle = "#444";
+
+      for (let x = 0; x < cols; x++) {
+        for (let y = 0; y < rows; y++) {
           const key = `${x},${y}`;
           if (clickedPixels.has(key)) {
-            ctx.fillStyle = "#700";
+            ctx.fillStyle = "darkred";
+            ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
           } else {
-            ctx.fillStyle = "#333";
+            ctx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
           }
-          ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize - 1, pixelSize - 1);
         }
       }
     }
@@ -72,11 +99,19 @@
     }
 
     canvas.addEventListener("click", async (e) => {
+      if (!canClick) {
+        alert("You must buy a try first.");
+        return;
+      }
+
       const rect = canvas.getBoundingClientRect();
       const x = Math.floor((e.clientX - rect.left) / pixelSize);
       const y = Math.floor((e.clientY - rect.top) / pixelSize);
 
-      if (clickedPixels.has(`${x},${y}`)) return;
+      if (clickedPixels.has(`${x},${y}`)) {
+        alert("This pixel was already tried.");
+        return;
+      }
 
       try {
         const res = await fetch("https://pixel-jackpot.onrender.com/api/click", {
@@ -84,29 +119,29 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ x, y })
         });
+
         const data = await res.json();
         if (data.won) {
-          alert(`🎉 ¡Has ganado ${data.amount.toFixed(2)} €!`);
+          alert(`🎉 You won ${data.amount.toFixed(2)} €!`);
         } else {
           markClicked(x, y);
         }
+
         fetchJackpot();
+        canClick = false; // reset after click
       } catch {
-        alert("Error al hacer clic.");
+        alert("Error processing click.");
       }
     });
 
-    async function fetchJackpot() {
-      const res = await fetch("https://pixel-jackpot.onrender.com/api/status");
-      const data = await res.json();
-      document.getElementById("jackpotDisplay").textContent =
-        `Jackpot actual: ${data.jackpot.toFixed(2)} €`;
-    }
-
+    // Buy click system
+    let canClick = false;
     document.getElementById("buyClickBtn").addEventListener("click", () => {
+      canClick = true;
       document.getElementById("paymentOptions").style.display = "block";
     });
 
+    // Init
     fetchJackpot();
     drawGrid();
   </script>
