@@ -2,121 +2,186 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Pixel Jackpot</title>
   <style>
     body {
+      margin: 0;
+      background-color: #111;
+      color: white;
       font-family: Arial, sans-serif;
       text-align: center;
-      background: #121212;
-      color: #fff;
-      margin: 0;
-      padding: 0;
     }
+
     h1 {
-      margin-top: 20px;
+      color: #FFD700;
+      font-size: 2.5em;
+      margin: 20px 0 5px;
     }
+
     #jackpot {
-      font-size: 1.5em;
+      font-size: 1.3em;
+      margin-bottom: 5px;
+    }
+
+    #remaining {
+      font-size: 0.9em;
+      color: #ccc;
       margin-bottom: 10px;
     }
-    #remaining {
-      margin-bottom: 20px;
-    }
+
     #progressBar {
       width: 300px;
-      height: 20px;
-      background: #444;
-      border-radius: 10px;
+      height: 10px;
+      background-color: #333;
+      margin: 0 auto 20px;
+      border-radius: 5px;
       overflow: hidden;
-      margin: 10px auto;
     }
+
     #progress {
       height: 100%;
-      background: limegreen;
+      background: linear-gradient(90deg, #00FF66, #FFD700);
       width: 0%;
-      transition: width 0.5s;
+      transition: width 0.5s ease;
     }
+
     canvas {
-      border: 2px solid #fff;
+      border: 2px solid white;
+      display: block;
+      margin: 0 auto;
+      background-color: #222;
       cursor: pointer;
-      margin-top: 10px;
-      transition: transform 0.2s;
     }
-    canvas:hover {
-      transform: scale(1.01);
+
+    .cell:hover {
+      background-color: #555;
+      transition: background-color 0.2s ease;
+    }
+
+    #paymentOptions {
+      margin-top: 10px;
+    }
+
+    #paymentOptions a {
+      color: #00aaff;
+      display: block;
+      text-decoration: none;
+      margin-top: 5px;
+    }
+
+    #buyClickBtn {
+      background-color: yellow;
+      color: black;
+      border: none;
+      padding: 10px 20px;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 5px;
+      transition: background-color 0.3s ease;
+    }
+
+    #buyClickBtn:hover {
+      background-color: gold;
     }
   </style>
 </head>
 <body>
-  <h1>Pixel Jackpot</h1>
+  <h1>💰 Pixel Jackpot</h1>
   <div id="jackpot">Jackpot: $0</div>
   <div id="remaining">Remaining: 0 / 40000</div>
   <div id="progressBar"><div id="progress"></div></div>
-  <canvas id="grid" width="1000" height="500"></canvas>
+
+  <canvas id="gridCanvas" width="1000" height="1000"></canvas>
+
+  <button id="buyClickBtn">Buy 1 Try ($1)</button>
+  <div id="paymentOptions">
+    <a href="https://www.paypal.com/paypalme/tuusuario/1" target="_blank">Pay with PayPal</a>
+    <a href="https://commerce.coinbase.com/checkout/tucheckout" target="_blank">Pay with Crypto</a>
+  </div>
 
   <script>
-    const canvas = document.getElementById("grid");
-    const ctx = canvas.getContext("2d");
-    const jackpotEl = document.getElementById("jackpot");
-    const remainingEl = document.getElementById("remaining");
-    const progressEl = document.getElementById("progress");
-
-    const cols = 200;
-    const rows = 100;
+    const canvas = document.getElementById('gridCanvas');
+    const ctx = canvas.getContext('2d');
     const cellSize = 5;
-    let usedClicks = new Set();
-    let jackpot = 100;
+    const cols = canvas.width / cellSize;
+    const rows = canvas.height / cellSize;
+    const totalCells = cols * rows;
 
-    function drawGrid() {
+    let usedCells = new Set();
+    let winningCell = null;
+    let jackpotAmount = 0;
+
+    const updateUI = () => {
+      document.getElementById('jackpot').textContent = `Jackpot: $${jackpotAmount.toFixed(2)}`;
+      document.getElementById('remaining').textContent = `Remaining: ${totalCells - usedCells.size} / ${totalCells}`;
+      const progress = (usedCells.size / totalCells) * 100;
+      document.getElementById('progress').style.width = `${progress}%`;
+    };
+
+    const drawGrid = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       for (let y = 0; y < rows; y++) {
         for (let x = 0; x < cols; x++) {
-          const id = `${x},${y}`;
-          ctx.fillStyle = usedClicks.has(id) ? "#ff5555" : "#333";
-          ctx.fillRect(x * cellSize, y * cellSize, cellSize - 1, cellSize - 1);
+          const key = `${x},${y}`;
+          if (usedCells.has(key)) {
+            ctx.fillStyle = key === winningCell ? 'gold' : 'red';
+            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+          } else {
+            ctx.fillStyle = '#222';
+            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+          }
         }
       }
-    }
+    };
 
-    async function fetchState() {
-      const res = await fetch("http://localhost:3000/jackpot");
-      const data = await res.json();
-      jackpot = data.jackpot;
+    const fetchState = async () => {
+      try {
+        const res = await fetch('https://pixel-backend.onrender.com/state');
+        const data = await res.json();
+        jackpotAmount = data.jackpot || 0;
+        usedCells = new Set(data.usedClicks || []);
+        winningCell = data.winningCell;
+        updateUI();
+        drawGrid();
+      } catch (err) {
+        console.error("Error fetching state:", err);
+      }
+    };
 
-      const clickRes = await fetch("http://localhost:3000/api/grid");
-      const clickData = await clickRes.json();
-      usedClicks = new Set(clickData.clicks.map(c => `${c.x},${c.y}`));
-
-      updateUI();
-      drawGrid();
-    }
-
-    function updateUI() {
-      jackpotEl.textContent = `Jackpot: $${jackpot.toFixed(2)}`;
-      remainingEl.textContent = `Remaining: ${usedClicks.size} / ${cols * rows}`;
-      progressEl.style.width = `${(usedClicks.size / (cols * rows)) * 100}%`;
-    }
-
-    canvas.addEventListener("click", async (e) => {
+    canvas.addEventListener('click', async (e) => {
       const rect = canvas.getBoundingClientRect();
       const x = Math.floor((e.clientX - rect.left) / cellSize);
       const y = Math.floor((e.clientY - rect.top) / cellSize);
-      const id = `${x},${y}`;
-      if (usedClicks.has(id)) return alert("This cell has already been clicked.");
+      const key = `${x},${y}`;
 
-      const res = await fetch("http://localhost:3000/click", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ x, y })
-      });
+      if (usedCells.has(key)) {
+        alert("This cell is already used!");
+        return;
+      }
 
-      const result = await res.json();
-      if (result.won) alert(`🎉 You won $${result.amount.toFixed(2)}!`);
-      usedClicks.add(id);
-      jackpot = result.won ? 100 : jackpot + 1;
-      updateUI();
-      drawGrid();
+      try {
+        const res = await fetch('https://pixel-backend.onrender.com/click', {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ x, y })
+        });
+        const data = await res.json();
+
+        if (data.won) {
+          alert(`🎉 You won $${data.amount.toFixed(2)}!`);
+        } else {
+          alert("❌ Not a winning cell!");
+        }
+
+        await fetchState();
+      } catch (err) {
+        console.error("Click error:", err);
+      }
+    });
+
+    document.getElementById('buyClickBtn').addEventListener('click', () => {
+      alert("Please use one of the links below to pay. Thank you!");
     });
 
     fetchState();
